@@ -4,7 +4,6 @@
 ;;debugging parts of expressions
 (defmacro dbg[x] `(let [x# ~x] (println "dbg:" '~x "=" x#) x#))
 
-(def path "../lab1_task/бабочка.txt")
 (def dim 2)
 (def r_a 3.0)
 (def r_b (* 1.5 r_a))
@@ -102,6 +101,7 @@
 
 (defn -main
   [& args]
-  (let [points (read-points-from-file path)
-       points (calculate-potentials points)]
+  (let [path (first args)
+        points (read-points-from-file path)
+        points (calculate-potentials points)]
     (doseq [center (find-centers points)] (println center))))
