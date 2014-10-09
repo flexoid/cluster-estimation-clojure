@@ -4,7 +4,6 @@
 ;;debugging parts of expressions
 (defmacro dbg[x] `(let [x# ~x] (println "dbg:" '~x "=" x#) x#))
 
-(def dim 2)
 (def r_a 3.0)
 (def r_b (* 1.5 r_a))
 (def e_up 0.5)
@@ -13,20 +12,13 @@
 (def pot_a_koeff (/ 4 (Math/pow r_a 2)))
 (def pot_b_koeff (/ 4 (Math/pow r_b 2)))
 
-(defrecord Point [coords potential])
-
 (defn square-dist [coords1 coords2]
-  (reduce
-    (fn [res i]
-      (+
-        res
-        (Math/pow
-          (-
-            (get coords2 i)
-            (get coords1 i))
-          2)))
-    0.0
-    (range dim)))
+  {:pre [(= (count coords1) (count coords2))]}
+  (apply +
+    (map
+      (fn [x y] (Math/pow (- x y) 2))
+      coords1
+      coords2)))
 
 (defn calculate-potential [point, points]
   (let [new-potential
@@ -57,10 +49,8 @@
   (map #(revise-potential % points base-point) points))
 
 (defn parse-line-to-point [line]
-  (Point.
-    (vec
-      (map #(Double/parseDouble %) (.split #"," line)))
-    0.0))
+  {:coords (vec (map #(Double/parseDouble %) (.split #"," line)))
+   :potential 0.0})
 
 (defn max-potential-point [points]
   (apply max-key
@@ -79,7 +69,7 @@
          revised-points (revise-potentials points max-point)]
 
       (if-not first-center-potential
-          (find-centers revised-points (-> max-point :potential) [max-point])
+          (recur revised-points (-> max-point :potential) [max-point])
 
           (if
             (or
@@ -91,10 +81,11 @@
                   (/ (shortest-distance max-point centers) r_a)
                   (/ (-> max-point :potential) first-center-potential))
                 1))
-            (find-centers revised-points first-center-potential (conj centers max-point))
+            (recur revised-points first-center-potential (conj centers max-point))
             centers)))))
 
 (defn read-points-from-file [path]
+  {:pre [(not (nil? path))]}
   (with-open [r (clojure.java.io/reader path)]
     (doall (map #(parse-line-to-point %)
       (line-seq r)))))
