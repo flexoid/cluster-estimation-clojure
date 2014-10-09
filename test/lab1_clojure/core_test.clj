@@ -21,6 +21,11 @@
       (-> (calculate-potential point2 [point1 point2]) :potential)
       1.108368023221896))))
 
+(deftest test-parse-line-to-point
+  (is (=
+    (parse-line-to-point "48,12,5.4")
+    {:coords [48.0 12.0 5.4], :potential 0.0})))
+
 (deftest test-read-points-from-file
   (let [path "test/fixtures/points.txt"
         points [{:coords [5.0 8.0], :potential 0.0} {:coords [6.0 1.0], :potential 0.0}]]
