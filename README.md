@@ -2,7 +2,12 @@ Cluster centers estimation laboratory work written on clojure
 
 ## Usage
 
-    $ lein run <file>
+    $ lein run <distance-type> <file>
+
+    Supported distance types:
+
+      * euclidean
+      * hamming
 
 ## Run specs
 

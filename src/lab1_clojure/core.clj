@@ -12,15 +12,15 @@
 (def pot_a_koeff (/ 4 (Math/pow r_a 2)))
 (def pot_b_koeff (/ 4 (Math/pow r_b 2)))
 
-(defn square-dist [coords1 coords2]
+(defn euclidean-distance [coords1 coords2]
   {:pre [(= (count coords1) (count coords2))]}
-  (apply +
-    (map
-      (fn [x y] (Math/pow (- x y) 2))
-      coords1
-      coords2)))
+  (Math/sqrt (apply + (map #(Math/pow (- %1 %2) 2) coords1 coords2))))
 
-(defn calculate-potential [point, points]
+(defn hamming-distance [coords1 coords2]
+  {:pre [(= (count coords1) (count coords2))]}
+  (apply + (map #(if (= %1 %2) 0 1) coords1 coords2)))
+
+(defn calculate-potential [point, points, distance-func]
   (let [new-potential
         (reduce
           (fn [res other-point]
@@ -30,7 +30,7 @@
               Math/E
               (*
                 (- pot_a_koeff)
-                (square-dist
+                (distance-func
                   (point :coords)
                   (other-point :coords))))))
             0.0
@@ -38,10 +38,10 @@
 
     (assoc point :potential new-potential)))
 
-(defn calculate-potentials [points]
-  (map #(calculate-potential % points) points))
+(defn calculate-potentials [points distance-func]
+  (map #(calculate-potential % points distance-func) points))
 
-(defn revise-potential [point points base-point]
+(defn revise-potential [point points base-point distance-func]
   (let [revised-potential
         (-
           (point :potential)
@@ -51,14 +51,14 @@
               Math/E
               (*
                 (- pot_b_koeff)
-                (square-dist
+                (distance-func
                   (point :coords)
                   (base-point :coords))))))]
 
     (assoc point :potential revised-potential)))
 
-(defn revise-potentials [points base-point]
-  (map #(revise-potential % points base-point) points))
+(defn revise-potentials [points base-point distance-func]
+  (map #(revise-potential % points base-point distance-func) points))
 
 (defn parse-line-to-point [line]
   {:coords (vec (map #(Double/parseDouble %) (drop-last (.split #"," line))))
@@ -80,24 +80,24 @@
         point))
     points))
 
-(defn shortest-distance [point points]
-  (Math/sqrt (apply min (map #(square-dist (point :coords) (% :coords)) points))))
+(defn shortest-distance [point points distance-func]
+  (Math/sqrt (apply min (map #(distance-func (point :coords) (% :coords)) points))))
 
 (defn find-centers
-  ([points]
-    (find-centers points nil []))
+  ([points distance-func]
+    (find-centers points nil [] distance-func))
 
-  ([points first-center-potential centers]
+  ([points first-center-potential centers distance-func]
     (let [max-point (max-potential-point points)
-         revised-points (revise-potentials points max-point)]
+         revised-points (revise-potentials points max-point distance-func)]
 
       (if-not first-center-potential
-        (recur revised-points (max-point :potential) [max-point])
+        (recur revised-points (max-point :potential) [max-point] distance-func)
         (if
           (>
             (max-point :potential)
             (* e_max first-center-potential))
-          (recur revised-points first-center-potential (conj centers max-point))
+          (recur revised-points first-center-potential (conj centers max-point) distance-func)
           (if
             (<
               (max-point :potential)
@@ -106,14 +106,15 @@
             (if
               (>=
                 (+
-                  (/ (shortest-distance max-point centers) r_a)
+                  (/ (shortest-distance max-point centers distance-func) r_a)
                   (/ (max-point :potential) first-center-potential))
                 1)
-              (recur revised-points first-center-potential (conj centers max-point))
+              (recur revised-points first-center-potential (conj centers max-point) distance-func)
               (recur
                 (nullify-point-potential revised-points max-point)
                 first-center-potential
-                centers))))))))
+                centers
+                distance-func))))))))
 
 (defn read-points-from-file [path]
   {:pre [(not (nil? path))]}
@@ -122,6 +123,10 @@
       (line-seq r)))))
 
 (defn -main
-  [file]
-  (let [points (-> file read-points-from-file calculate-potentials)]
-    (doseq [center (find-centers points)] (println center))))
+  [distance-type file]
+  (let [distance-func (case distance-type
+                        "euclidean" euclidean-distance
+                        "hamming" hamming-distance)
+        points (read-points-from-file file)
+        points (calculate-potentials points distance-func)]
+    (doseq [center (find-centers points distance-func)] (println center))))
