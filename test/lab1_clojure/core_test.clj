@@ -23,7 +23,7 @@
 
 (deftest test-parse-line-to-point
   (is (=
-    (parse-line-to-point "48,12,5.4")
+    (parse-line-to-point "48,12,5.4,Iris-setosa")
     {:coords [48.0 12.0 5.4], :potential 0.0})))
 
 (deftest test-read-points-from-file
@@ -38,3 +38,10 @@
   (is (thrown?
     java.io.FileNotFoundException
     (read-points-from-file "non-existing-file.txt"))))
+
+(deftest test-nullify-point-potential
+  (is (=
+    (nullify-point-potential
+      [{:coords [5.0 8.0], :potential 3.0} {:coords [6.0 1.0], :potential 5.0}]
+      {:coords [6.0 1.0], :potential 5.0})
+    [{:coords [5.0 8.0], :potential 3.0} {:coords [6.0 1.0], :potential 0.0}])))

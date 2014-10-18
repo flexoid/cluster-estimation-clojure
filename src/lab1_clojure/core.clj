@@ -6,8 +6,8 @@
 
 (def r_a 3.0)
 (def r_b (* 1.5 r_a))
-(def e_up 0.5)
-(def e_down 0.15)
+(def e_max 0.5)
+(def e_min 0.15)
 
 (def pot_a_koeff (/ 4 (Math/pow r_a 2)))
 (def pot_b_koeff (/ 4 (Math/pow r_b 2)))
@@ -31,8 +31,8 @@
               (*
                 (- pot_a_koeff)
                 (square-dist
-                  (-> point :coords)
-                  (-> other-point :coords))))))
+                  (point :coords)
+                  (other-point :coords))))))
             0.0
             points)]
 
@@ -44,16 +44,16 @@
 (defn revise-potential [point points base-point]
   (let [revised-potential
         (-
-          (-> point :potential)
+          (point :potential)
           (*
-            (-> base-point :potential)
+            (base-point :potential)
             (Math/pow
               Math/E
               (*
                 (- pot_b_koeff)
                 (square-dist
-                  (-> point :coords)
-                  (-> base-point :coords))))))]
+                  (point :coords)
+                  (base-point :coords))))))]
 
     (assoc point :potential revised-potential)))
 
@@ -61,16 +61,27 @@
   (map #(revise-potential % points base-point) points))
 
 (defn parse-line-to-point [line]
-  {:coords (vec (map #(Double/parseDouble %) (.split #"," line)))
+  {:coords (vec (map #(Double/parseDouble %) (drop-last (.split #"," line))))
    :potential 0.0})
 
 (defn max-potential-point [points]
   (apply max-key
-    (fn [point] (-> point :potential))
+    (fn [point] (point :potential))
+    points))
+
+(defn nullify-point-potential [points target-point]
+  (map
+    (fn [point]
+      (if
+        (=
+          (point :coords)
+          (target-point :coords))
+        (assoc point :potential 0.0)
+        point))
     points))
 
 (defn shortest-distance [point points]
-  (Math/sqrt (apply min (map #(square-dist (-> point :coords) (-> % :coords)) points))))
+  (Math/sqrt (apply min (map #(square-dist (point :coords) (% :coords)) points))))
 
 (defn find-centers
   ([points]
@@ -81,20 +92,28 @@
          revised-points (revise-potentials points max-point)]
 
       (if-not first-center-potential
-        (recur revised-points (-> max-point :potential) [max-point])
-
+        (recur revised-points (max-point :potential) [max-point])
         (if
-          (or
-            (>
-              (-> max-point :potential)
-              (* e_up first-center-potential))
-            (>=
-              (+
-                (/ (shortest-distance max-point centers) r_a)
-                (/ (-> max-point :potential) first-center-potential))
-              1))
+          (>
+            (max-point :potential)
+            (* e_max first-center-potential))
           (recur revised-points first-center-potential (conj centers max-point))
-          centers)))))
+          (if
+            (<
+              (max-point :potential)
+              (* e_min first-center-potential))
+            centers
+            (if
+              (>=
+                (+
+                  (/ (shortest-distance max-point centers) r_a)
+                  (/ (max-point :potential) first-center-potential))
+                1)
+              (recur revised-points first-center-potential (conj centers max-point))
+              (recur
+                (nullify-point-potential revised-points max-point)
+                first-center-potential
+                centers))))))))
 
 (defn read-points-from-file [path]
   {:pre [(not (nil? path))]}
@@ -103,6 +122,6 @@
       (line-seq r)))))
 
 (defn -main
-  [& args]
-  (let [points (-> (first args) read-points-from-file calculate-potentials)]
+  [file]
+  (let [points (-> file read-points-from-file calculate-potentials)]
     (doseq [center (find-centers points)] (println center))))
